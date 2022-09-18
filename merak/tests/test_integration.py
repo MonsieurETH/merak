@@ -4,52 +4,39 @@ from ..codegen import CodeGenerator
 
 from ..lexer import MerakLexer
 from ..parser import MerakParser
-from ..codegen import BasicExecute
 
 
 def test_basic():
     text = """
-        impl contrateto {
+    impl contrateto {
+
+        //abi UniswapV2Pair {
+        //    getReserves();
+        //    _safeTransfer(address token, address to, uint value);
+        //}
+
+        struct Data {
+            A: u256;
+            B: i256;
+        }
+
         fn function1(param1: u256) -> (u256) {
             // This is a comment
             return param1 + 1;
-        };
+            //pair1, pair2 = UniswapV2Pair(0x3333).getReserves();
+        }
     }
     """
 
-    llexer = MerakLexer()
-    tokenized = llexer.tokenize(text)
+    merakLexer = MerakLexer()
+    tokenized = merakLexer.tokenize(text)
 
-    lparser = MerakParser()
-    tree = lparser.parse(tokenized)
+    merakParser = MerakParser()
+    tree = merakParser.parse(tokenized)
+
+    # scopeEnv = ScopeBuilder(tree).build()
+    # typeEnv = TypeChecker(tree).check()
+    # code = CodeGenerator(scopeEnv, typeEnv).generate(tree)
 
     code = CodeGenerator().run(tree)
-    a = 1
-
-
-def test_basic2():
-    llexer = MerakLexer()
-    lparser = MerakParser()
-
-    text = """
-        impl contrateto {
-        fn algoif(roberto) -> (u256) {
-            return roberto + 1;
-        };
-        fn algoels(alejandro) {
-            algo = alejandro + 3;
-        };
-        fn algowhile(roxana) -> (u256) {
-            roxana = 2;
-        };
-    }
-    """
-
-    # for a in llexer.tokenize(text):
-    #    print(a)
-
-    tree = lparser.parse(llexer.tokenize(text))
-
-    aca = BasicExecute().run(tree)
-    print(a)
     a = 1

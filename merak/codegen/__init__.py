@@ -1,2 +1,2 @@
-from .codegen import BasicExecute
-from .IR import Contract, Interface, Function, Code
+from .codegen import CodeGenerator
+from .huffIR import Contract, Interface, Function, Code

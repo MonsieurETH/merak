@@ -1,12 +1,13 @@
 from ..parser import AST as ast
-from . import IR as ir
-from .symbol_table import SymbolTable, SymbolVariable, SymbolConstant
+from . import huffIR as ir
+
+# from ..analyzers.symbolTable import SymbolTable, SymbolVariable, SymbolConstant
 from collections import deque
 
 
 class CodeGenerator:
     def __init__(self) -> None:
-        self.symbolTable = SymbolTable()
+        # self.symbolTable = SymbolTable()
         self.functions = dict()
         self.args = dict()
         self.actual_function = None
@@ -56,8 +57,8 @@ class CodeGenerator:
                 return [var]
         elif isinstance(node, ast.GlobalVariable):
             # GlobalVariable(id, type) -> None
-            var = SymbolVariable(node.id, node.type, None, static=True)
-            self.symbolTable.define(var)
+            # var = SymbolVariable(node.id, node.type, None, static=True)
+            # elf.symbolTable.define(var)
             return ir.StorageSymbol(node)
         elif isinstance(node, ast.GlobalConstantsDeclaration):
             # GlobalConstantsDeclaration(constant, rest) -> None
@@ -70,8 +71,8 @@ class CodeGenerator:
                 return [const]
         elif isinstance(node, ast.GlobalConstant):
             # GlobalConstant(id, type, value) -> None
-            const = SymbolVariable(node.id, node.type, node.value, static=True)
-            self.symbolTable.define(const)
+            # const = SymbolVariable(node.id, node.type, node.value, static=True)
+            # self.symbolTable.define(const)
             return ir.StorageSymbol(node)
         elif isinstance(node, ast.Functions):
             # Functions(function, rest) -> None

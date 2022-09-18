@@ -25,14 +25,16 @@ class MerakLexer(Lexer):
         DIVIDE,
         ASSIGN,
         NUMBER,
-        WORD,
-        UWORD,
+        INT,
+        UINT,
+        BOOL,
         PURE,
         VIEW,
         PAYABLE,
         NONPAYABLE,
         STORAGE,
         CONST,
+        STRUCT,
     }
 
     # Tokens
@@ -67,8 +69,10 @@ class MerakLexer(Lexer):
     ID["nonpayable"] = NONPAYABLE
     ID["storage"] = STORAGE
     ID["const"] = CONST
-    ID["i256"] = WORD
-    ID["u256"] = UWORD
+    ID["i256"] = INT
+    ID["u256"] = UINT
+    ID["bool"] = BOOL
+    ID["struct"] = STRUCT
 
     # Ignored pattern
     ignore = " \t"

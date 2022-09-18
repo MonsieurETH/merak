@@ -17,6 +17,11 @@ class MerakParser(Parser):
     """
     impl contrateto {
 
+        struct Data {
+            A: u256;
+            B: i256;
+        }
+
         storage const supply: i256 = 10000;
         storage allowance: HashMap<u256, u256>;
 
@@ -42,11 +47,18 @@ class MerakParser(Parser):
         functionDefinition contractBody
         | globalVariableDeclaration contractBody
         | globalConstantDeclaration contractBody
+        | structDeclaration contractBody
+        | empty
+
+    structDeclaration: STRUCT ID LBRACE structVars RBRACE
+
+    structVars:
+        ID COLON type SEMICOLON functionArgs
         | empty
 
     functionDefinition:
-        FUNC ID LPAREN functionArgs RPAREN functionTypes LBRACE functionCode RBRACE SEMICOLON
-        | FUNC ID LPAREN functionArgs RPAREN RARROW LPAREN functionReturn RPAREN functionTypes LBRACE functionCode RBRACE SEMICOLON
+        FUNC ID LPAREN functionArgs RPAREN functionTypes LBRACE functionCode RBRACE
+        | FUNC ID LPAREN functionArgs RPAREN RARROW LPAREN functionReturn RPAREN functionTypes LBRACE functionCode RBRACE
 
     functionArgs:
         ID COLON type
@@ -73,7 +85,7 @@ class MerakParser(Parser):
         NUMBER
         | UMINUS NUMBER
 
-    type: WORD | UWORD
+    type: INT | UINT | BOOL
 
     globalVariableDeclaration: STORAGE ID COLON type SEMICOLON
 
@@ -106,6 +118,7 @@ class MerakParser(Parser):
         functionDefinition contractBody
         | globalVariableDeclaration contractBody
         | globalConstantDeclaration contractBody
+        | structDeclaration contractBody
         | empty
     """
 
@@ -113,11 +126,12 @@ class MerakParser(Parser):
         "functionDefinition contractBody",
         "globalVariableDeclaration contractBody",
         "globalConstantDeclaration contractBody",
+        "structDeclaration contractBody",
         "empty",
     )
     def contractBody(self, p):
         if hasattr(p, "functionDefinition"):
-            return Functions(p.functionDefinition, p.contractBody)
+            return Function(p.functionDefinition, p.contractBody)
         if hasattr(p, "globalVariableDeclaration"):
             return GlobalVariablesDeclaration(
                 p.globalVariableDeclaration, p.contractBody
@@ -126,33 +140,35 @@ class MerakParser(Parser):
             return GlobalConstantsDeclaration(
                 p.globalConstantDeclaration, p.contractBody
             )
+        if hasattr(p, "structDeclaration"):
+            return StructDeclaration(p.structDeclaration, p.contractBody)
         return Empty()
 
     """
-    globalVariableDeclaration: STATIC ID COLON type SEMICOLON
+    globalVariableDeclaration: STORAGE ID COLON type SEMICOLON
     """
 
-    @_("STATIC ID COLON type SEMICOLON")
+    @_("STORAGE ID COLON type SEMICOLON")
     def globalVariableDeclaration(self, p):
         return GlobalVariable(p.ID, p.type)
 
     """
-    globalConstantDeclaration: STATIC CONST ID COLON type ASSIGN value SEMICOLON
+    globalConstantDeclaration: STORAGE CONST ID COLON type ASSIGN value SEMICOLON
     """
 
-    @_("STATIC CONST ID COLON type ASSIGN value SEMICOLON")
+    @_("STORAGE CONST ID COLON type ASSIGN value SEMICOLON")
     def globalConstantDeclaration(self, p):
         return GlobalConstant(p.ID, p.type, p.value)
 
     """
     functionDefinition:
-        FUNC ID LPAREN functionArgs RPAREN functionTypes LBRACE functionCode RBRACE SEMICOLON
-        | FUNC ID LPAREN functionArgs RPAREN RARROW LPAREN functionReturn RPAREN functionTypes LBRACE functionCode RBRACE SEMICOLON
+        FUNC ID LPAREN functionArgs RPAREN functionTypes LBRACE functionCode RBRACE
+        | FUNC ID LPAREN functionArgs RPAREN RARROW LPAREN functionReturn RPAREN functionTypes LBRACE functionCode RBRACE
     """
 
     @_(
-        "FUNC ID LPAREN functionArgs RPAREN functionTypes LBRACE functionCode RBRACE SEMICOLON",
-        "FUNC ID LPAREN functionArgs RPAREN RARROW LPAREN functionReturn RPAREN functionTypes LBRACE functionCode RBRACE SEMICOLON",
+        "FUNC ID LPAREN functionArgs RPAREN functionTypes LBRACE functionCode RBRACE",
+        "FUNC ID LPAREN functionArgs RPAREN RARROW LPAREN functionReturn RPAREN functionTypes LBRACE functionCode RBRACE",
     )
     def functionDefinition(self, p):
         if hasattr(p, "functionReturn"):
@@ -211,10 +227,33 @@ class MerakParser(Parser):
         return FunctionReturn(p.type, None)
 
     """
-    type: WORD | UWORD
+    structDeclaration: STRUCT ID LBRACE structVars RBRACE
     """
 
-    @_("WORD", "UWORD")
+    @_("STRUCT ID LBRACE structVars RBRACE")
+    def structDeclaration(self, p):
+        return Struct(p.ID, p.structVars)
+
+    """
+    structVars:
+        ID COLON type SEMICOLON structVars
+        | empty
+    """
+
+    @_("ID COLON type SEMICOLON structVars", "empty")
+    def structVars(self, p):
+        if hasattr(p, "structVars"):
+            return StructVars(p.ID, p.type, p.structVars)
+        if hasattr(p, "type"):
+            return StructVars(p.ID, p.type, None)
+
+        return Empty()
+
+    """
+    type: INT | UINT | BOOL
+    """
+
+    @_("INT", "UINT", "BOOL")
     def type(self, p):
         return p[0]
 
@@ -234,9 +273,9 @@ class MerakParser(Parser):
     )
     def functionCode(self, p):
         if hasattr(p, "type"):
-            return AssignCode(p.ID, p.type, p.expression)
+            return VarDefinition(p.ID, p.type, p.expression)
 
-        return AssignCode(p.ID, None, p.expression)
+        return VarAssigment(p.ID, p.expression)
 
     """
     expression:
@@ -293,5 +332,5 @@ class MerakParser(Parser):
         return NameExpression(p.ID)
 
     @_("")
-    def empty(self, _):
+    def empty(self, p):
         return Empty()

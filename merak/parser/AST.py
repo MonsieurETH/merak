@@ -10,7 +10,7 @@ class Contract:
         self.definition = definition
 
 
-class Functions:
+class Function:
     def __init__(self, function, rest) -> None:
         self.function = function
         self.rest = rest
@@ -39,6 +39,25 @@ class GlobalConstant:
         self.id = id
         self.type = type
         self.value = value
+
+
+class StructDeclaration:
+    def __init__(self, struct, rest) -> None:
+        self.struct = struct
+        self.rest = rest
+
+
+class Struct:
+    def __init__(self, name, vars) -> None:
+        self.name = name
+        self.vars = vars
+
+
+class StructVars:
+    def __init__(self, id, type, rest) -> None:
+        self.id = id
+        self.type = type
+        self.rest = rest
 
 
 class FunctionDefinition:
@@ -85,7 +104,13 @@ class ReturnCode:
         self.expression = expression
 
 
-class AssignCode:
+class VarDefinition:
+    def __init__(self, id, type, expression) -> None:
+        self.id = id
+        self.type = type
+        self.expression = expression
+
+class VarAssigment:
     def __init__(self, id, expression) -> None:
         self.id = id
         self.expression = expression
@@ -97,7 +122,8 @@ class NameExpression:
 
 
 class NumberExpression:
-    def __init__(self, number) -> None:
+    def __init__(self, sign, number) -> None:
+        self.sign = sign
         self.number = number
 
 
