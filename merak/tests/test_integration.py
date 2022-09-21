@@ -4,8 +4,6 @@ from ..codegen import CodeGenerator
 
 from ..lexer import MerakLexer
 from ..parser import MerakParser
-from ..analyzers.scopeBuilder import ScopeBuilder
-from ..analyzers.typeChecker import TypeChecker
 
 test = """
     impl contrateto {
@@ -54,5 +52,5 @@ def test_basic():
     # TypeChecker(scopeEnv).check(tree)
     # code = CodeGenerator(scopeEnv, typeEnv).generate(tree)
 
-    code = CodeGenerator().run(tree)
+    #code = CodeGenerator().run(tree)
     a = 1
