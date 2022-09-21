@@ -70,7 +70,8 @@ class MerakParser(Parser):
     functionReturn: type COMMA functionReturn | type
 
     functionCode:
-        ID COLON type ASSIGN expression SEMICOLON
+        ID ASSIGN expression SEMICOLON functionCode
+        | ID COLON type ASSIGN expression SEMICOLON functionCode
         | RETURN expression SEMICOLON
 
     expression:
@@ -259,23 +260,27 @@ class MerakParser(Parser):
 
     """
     functionCode:
-        ID ASSIGN expression SEMICOLON
+        ID ASSIGN expression SEMICOLON functionCode
+        | ID COLON type ASSIGN expression SEMICOLON functionCode
         | RETURN expression SEMICOLON
     """
+
+    @_(
+        "ID COLON type ASSIGN expression SEMICOLON functionCode",
+        "ID ASSIGN expression SEMICOLON functionCode",
+        "empty"
+    )
+    def functionCode(self, p):
+        if hasattr(p, "type"):
+            return VarDefinition(p.ID, p.type, p.expression, p.functionCode)
+        if hasattr(p, "expression"):
+            return VarAssigment(p.ID, p.expression, p.functionCode)
+
+        return Empty()
 
     @_("RETURN expression SEMICOLON")
     def functionCode(self, p):
         return ReturnCode(p.expression)
-
-    @_(
-        "ID COLON type ASSIGN expression SEMICOLON",
-        "ID ASSIGN expression SEMICOLON",
-    )
-    def functionCode(self, p):
-        if hasattr(p, "type"):
-            return VarDefinition(p.ID, p.type, p.expression)
-
-        return VarAssigment(p.ID, p.expression)
 
     """
     expression:

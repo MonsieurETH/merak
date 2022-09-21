@@ -4,10 +4,10 @@ from ..codegen import CodeGenerator
 
 from ..lexer import MerakLexer
 from ..parser import MerakParser
+from ..analyzers.scopeBuilder import ScopeBuilder
+from ..analyzers.typeChecker import TypeChecker
 
-
-def test_basic():
-    text = """
+test = """
     impl contrateto {
 
         //abi UniswapV2Pair {
@@ -28,14 +28,30 @@ def test_basic():
     }
     """
 
+def test_basic():
+    text = """
+    impl contrateto {
+
+        struct Data {
+            A: u256;
+            B: i256;
+        }
+
+        fn function1(param1: u256) -> (u256) view {
+            var1: u256 = 2;
+            return param1 + 1 - var1;
+        }
+    }
+    """
+
     merakLexer = MerakLexer()
     tokenized = merakLexer.tokenize(text)
 
     merakParser = MerakParser()
     tree = merakParser.parse(tokenized)
 
-    # scopeEnv = ScopeBuilder(tree).build()
-    # typeEnv = TypeChecker(tree).check()
+    # scopeEnv = ScopeBuilder().build(tree)
+    # TypeChecker(scopeEnv).check(tree)
     # code = CodeGenerator(scopeEnv, typeEnv).generate(tree)
 
     code = CodeGenerator().run(tree)

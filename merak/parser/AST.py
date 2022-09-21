@@ -105,15 +105,17 @@ class ReturnCode:
 
 
 class VarDefinition:
-    def __init__(self, id, type, expression) -> None:
+    def __init__(self, id, type, expression, rest) -> None:
         self.id = id
         self.type = type
         self.expression = expression
+        self.rest = rest
 
 class VarAssigment:
-    def __init__(self, id, expression) -> None:
+    def __init__(self, id, expression, rest) -> None:
         self.id = id
         self.expression = expression
+        self.rest = rest
 
 
 class NameExpression:
