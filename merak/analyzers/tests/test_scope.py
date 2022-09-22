@@ -3,6 +3,7 @@ import pytest
 from ...lexer import MerakLexer
 from ...parser import MerakParser
 from ..symbolTableBuilder import (
+    Scope,
     SymbolTableBuilder,
     GlobalScope,
     StructScope,
@@ -41,7 +42,8 @@ def test_basic_scope():
     merakParser = MerakParser()
     tree = merakParser.parse(tokenized)
 
-    scopeTree = SymbolTableBuilder().build(tree)
+    symbolTable = SymbolTableBuilder().build(tree)
+    scopeTree = symbolTable.getScope()
 
     assert isinstance(scopeTree, GlobalScope)
     assert scopeTree.parent is None
