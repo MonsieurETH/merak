@@ -1,6 +1,5 @@
 from ..parser import AST as ast
 
-
 class SymbolTableBuilder:
 
     def __init__(self) -> None:
@@ -8,195 +7,22 @@ class SymbolTableBuilder:
 
     def build(self, node):
         scope = self._build_scope(node)
-        self._check_types(node, scope=scope)
+        self._check_types(node, scope)
         return SymbolTable(scope)
 
-    def _build_scope(self, node, scope=None):
-        if scope is None:
-            gs = GlobalScope()
-            return self._build_scope(node, scope=gs)
+    def _build_scope(self, node):
+        gs = GlobalScope()
+        visitor = ScopeVisitor()
+        return node.build_scope(visitor, scope=gs)
 
-        if node is None:
-            return scope
-
-        if isinstance(node, ast.Definition):
-            # Definition(contract, rest) -> None
-            scope = self._build_scope(node.contract, scope=scope)
-        elif isinstance(node, ast.Contract):
-            # Contract(id, definition) -> None
-            scope = self._build_scope(node.definition, scope=scope)
-        elif isinstance(node, ast.GlobalVariablesDeclaration):
-            # GlobalVariablesDeclaration(variable, rest) -> None
-            scope = self._build_scope(node.variable, scope=scope)
-            scope = self._build_scope(node.rest, scope=scope)
-        elif isinstance(node, ast.GlobalVariable):
-            # GlobalVariable(id, type) -> None
-            sv = SymbolVariable(node.id, node.type, None, scope)
-            scope.addSymbol(sv)
-        elif isinstance(node, ast.GlobalConstantsDeclaration):
-            # GlobalConstantsDeclaration(constant, rest) -> None
-            scope = self._build_scope(node.constant, scope=scope)
-            scope = self._build_scope(node.rest, scope=scope)
-        elif isinstance(node, ast.GlobalConstant):
-            # GlobalConstant(id, type, value) -> None
-            sc = SymbolConstant(node.id, node.type, node.value, scope)
-            scope.addSymbol(sc)
-        elif isinstance(node, ast.StructDeclaration):
-            # StructDeclaration(struct, rest) -> None
-            scopeStruct = self._build_scope(node.struct, scope=scope)
-            scope.addChild(scopeStruct)
-            scope = self._build_scope(node.rest, scope=scope)
-        elif isinstance(node, ast.Struct):
-            # Struct(name, vars) -> None
-            sc = StructScope(node.name, parent=scope)
-            scope = self._build_scope(node.vars, scope=sc)
-        elif isinstance(node, ast.StructVars):
-            # StructVars(id, type, rest) -> None
-            sv = SymbolVariable(node.id, node.type, None, scope)
-            scope.addSymbol(sv)
-            scope = self._build_scope(node.rest, scope=scope)
-        elif isinstance(node, ast.Function):
-            # Functions(function, rest) -> None
-            scopefn = self._build_scope(node.function, scope=scope)
-            scope = self._build_scope(node.rest, scope=scopefn)
-        elif isinstance(node, ast.FunctionDefinition):
-            # FunctionDefinition(id, args, returns, body) -> None
-            fs = FunctionScope(node.id, parent=scope)
-            fs = self._build_scope(node.args, scope=fs)
-            fs = self._build_scope(node.returns, scope=fs)
-            ls = LocalScope(parent=fs)
-            ls = self._build_scope(node.body, scope=ls)
-            fs.addChild(ls)
-            scope.addChild(fs)
-        elif isinstance(node, ast.FunctionArgs):
-            # FunctionArgs(id, type, rest) -> None
-            fa = SymbolArgument(node.id, node.type, scope)
-            scope.addSymbol(fa)
-            scope = self._build_scope(node.rest, scope=scope)
-        elif isinstance(node, ast.FunctionReturn):
-            # FunctionReturn(type, rest) -> None
-            scope.addReturns(node.type)
-            scope = self._build_scope(node.rest, scope=scope)
-        elif isinstance(node, ast.FunctionTypes):
-            # FunctionTypes(type, rest) -> None
-            pass
-        elif isinstance(node, ast.BinaryOperation):
-            # BinaryOperation(op, left, right) -> None
-            pass
-        elif isinstance(node, ast.GroupExpression):
-            # GroupExpression(expression) -> None
-            pass
-        elif isinstance(node, ast.ReturnCode):
-            # ReturnCode(expression) -> None
-            pass
-        elif isinstance(node, ast.VarDefinition):
-            # VarDefinition(id, type, expression, rest) -> None
-            sv = SymbolVariable(
-                node.id, node.type, node.expression, scope
-            )
-            scope.addSymbol(sv)
-            scope = self._build_scope(node.rest, scope=scope)
-        elif isinstance(node, ast.VarAssigment):
-            # VarAssigment(id, expression, rest) -> None
-            scope = self._build_scope(node.rest, scope=scope)
-        elif isinstance(node, ast.NameExpression):
-            # NameExpression(name) -> None
-            pass
-        elif isinstance(node, ast.NumberExpression):
-            # NumberExpression(sign, number) -> None
-            pass
-        elif isinstance(node, ast.Empty):
-            # Empty() -> None
-            pass
-        else:
-            raise Exception("AST node not recognized: ", node)
-
-        return scope
-
-    def _check_types(self, node, scope=None):
+    def _check_types(self, node, scope):
         if scope is None:
             raise Exception('Undefined scope')
 
-        if node is None:
-            return scope
+        visitor = TypeVisitor()
+        node.check_type(visitor, scope=scope)
 
-        if isinstance(node, ast.Definition):
-            # Definition(contract, rest) -> None
-            self._check_types(node.contract, scope=scope)
-        elif isinstance(node, ast.Contract):
-            # Contract(id, definition) -> None
-            self._check_types(node.definition, scope=scope)
-        elif isinstance(node, ast.GlobalVariablesDeclaration):
-            # GlobalVariablesDeclaration(variable, rest) -> None
-            self._check_types(node.variable, scope=scope)
-            self._check_types(node.rest, scope=scope)
-        elif isinstance(node, ast.GlobalConstantsDeclaration):
-            # GlobalConstantsDeclaration(constant, rest) -> None
-            self._check_types(node.constant, scope=scope)
-            self._check_types(node.rest, scope=scope)
-        elif isinstance(node, ast.GlobalConstant):
-            # GlobalConstant(id, type, value) -> None
-            if not self.is_valid_type(node.type, node.value):
-                raise Exception(f'Value of {node.id} is not {node.type}')
-        elif isinstance(node, ast.StructDeclaration):
-            # StructDeclaration(struct, rest) -> None
-            self._check_types(node.rest, scope=scope)
-        elif isinstance(node, ast.Function):
-            # Functions(function, rest) -> None
-            self._check_types(node.function, scope=scope)
-            self._check_types(node.rest, scope=scope)
-        elif isinstance(node, ast.FunctionDefinition):
-            # FunctionDefinition(id, args, returns, body) -> None
-            fs = scope._get_child_by_name(node.id)
-            ls = fs.childs[0]
-            value = self._check_types(node.body, scope=ls)
-        elif isinstance(node, ast.BinaryOperation):
-            # BinaryOperation(op, left, right) -> None
-            left_value = self._check_types(node.left, scope=scope)
-            right_value = self._check_types(node.right, scope=scope)
-            return self.solve_binary_type(node.op, left_value, right_value)
-        elif isinstance(node, ast.GroupExpression):
-            # GroupExpression(expression) -> None
-            return self._check_types(node.expression)
-        elif isinstance(node, ast.ReturnCode):
-            # ReturnCode(expression) -> None
-            value = self._check_types(node.expression, scope=scope)
-            returns = scope.parent.returns
-            for ret in returns:
-                if not self.is_valid_type(ret, value):
-                    raise Exception(f'Return type in function {scope.parent.name} is not correct')
-        elif isinstance(node, ast.VarDefinition):
-            # VarDefinition(id, type, expression, rest) -> None
-            value = self._check_types(node.expression, scope=scope)
-            symbol = scope._get_symbol_by_name(node.id)
-            if not self.is_valid_type(symbol, value):
-                raise Exception(f'Value of {node.id} is not {symbol.type}')
-            self._check_types(node.rest, scope=scope)
-        elif isinstance(node, ast.VarAssigment):
-            # VarAssigment(id, expression, rest) -> None
-            value = self._check_types(node.expression, scope=scope)
-            symbol = scope._get_symbol_by_name(node.id)
-            if not self.is_valid_type(symbol, value):
-                raise Exception(f'Value of {node.id} is not {value}')
-            self._check_types(node.rest, scope=scope)
-        elif isinstance(node, ast.NameExpression):
-            # NameExpression(name) -> None
-            symbol = scope._get_symbol_by_name(node.name)
-            return symbol
-        elif isinstance(node, ast.NumberExpression):
-            # NumberExpression(sign, number) -> None
-            if node.sign == '-':
-                return UIntType
-            else:
-                return IntType
 
-        return scope
-
-    def is_valid_type(self, type, value):
-        return True
-
-    def solve_binary_type(self, op, left, right):
-        return IntType
 
 class SymbolTable:
     def __init__(self, scope) -> None:
@@ -204,6 +30,220 @@ class SymbolTable:
 
     def getScope(self):
         return self.scope
+
+class ScopeVisitor:
+
+    def buildScopeDefinition(self, node: ast.Definition, scope):
+        scope = node.contract.build_scope(self, scope=scope)
+        return scope
+
+    def buildScopeContract(self, node: ast.Contract, scope):
+        scope = node.definition.build_scope(self, scope=scope)
+        return scope
+
+    def buildScopeFunction(self, node: ast.Function, scope):
+        scope = node.function.build_scope(self, scope=scope)
+        if node.rest is not None:
+            scope = node.rest.build_scope(self, scope=scope)
+        return scope
+
+    def buildScopeGlobalVariableDefinition(self, node: ast.GlobalVariablesDeclaration, scope):
+        scope = node.variable.build_scope(self, scope=scope)
+        if node.rest is not None:
+            scope = node.rest.build_scope(self, scope=scope)
+        return scope
+
+    def buildScopeGlobalVariable(self, node: ast.GlobalVariable, scope):
+        sv = SymbolVariable(node.id, node.type, None, scope)
+        scope.addSymbol(sv)
+        return scope
+
+    def buildScopeGlobalConstantsDeclaration(self, node: ast.GlobalConstantsDeclaration, scope):
+        scope = node.constant.build_scope(self, scope=scope)
+        if node.rest is not None:
+            scope = node.rest.build_scope(self, scope=scope)
+        return scope
+
+    def buildScopeGlobalConstant(self, node: ast.GlobalConstant, scope):
+        sc = SymbolConstant(node.id, node.type, node.value, scope)
+        scope.addSymbol(sc)
+        return scope
+
+    def buildScopeStructDeclaration(self, node: ast.StructDeclaration, scope):
+        scopeStruct = node.struct.build_scope(self, scope=scope)
+        scope.addChild(scopeStruct)
+        if node.rest is not None:
+            scope = node.rest.build_scope(self, scope=scope)
+        return scope
+
+    def buildScopeStruct(self, node: ast.Struct, scope):
+        sc = StructScope(node.name, parent=scope)
+        scope = node.vars.build_scope(self, scope=sc)
+        return scope
+
+    def buildScopeStructVars(self, node: ast.StructVars, scope):
+        sv = SymbolVariable(node.id, node.type, None, scope)
+        scope.addSymbol(sv)
+        if node.rest is not None:
+            scope = node.rest.build_scope(self, scope=scope)
+        return scope
+
+    def buildScopeFunctionDefinition(self, node: ast.FunctionDefinition, scope):
+        fs = FunctionScope(node.id, parent=scope)
+        fs = node.args.build_scope(self, scope=fs)
+        fs = node.returns.build_scope(self, scope=fs)
+        ls = LocalScope(parent=fs)
+        ls = node.body.build_scope(self, scope=ls)
+        fs.addChild(ls)
+        scope.addChild(fs)
+        return scope
+
+    def buildScopeFunctionArgs(self, node: ast.FunctionArgs, scope):
+        fa = SymbolArgument(node.id, node.type, scope)
+        scope.addSymbol(fa)
+        if node.rest is not None:
+            scope = node.rest.build_scope(self, scope=scope)
+        return scope
+
+    def buildScopeFunctionReturn(self, node: ast.FunctionReturn, scope):
+        scope.addReturns(node.type)
+        if node.rest is not None:
+            scope = node.rest.build_scope(self, scope=scope)
+        return scope
+
+    def buildScopeFunctionTypes(self, node: ast.FunctionTypes, scope):
+        return scope
+
+    def buildScopeBinaryOperation(self, node: ast.BinaryOperation, scope):
+        return scope
+
+    def buildScopeGroupExpression(self, node: ast.GroupExpression, scope):
+        return scope
+
+    def buildScopeReturnCode(self, node: ast.ReturnCode, scope):
+        return scope
+
+    def buildScopeVarDefinition(self, node: ast.VarDefinition, scope):
+        sv = SymbolVariable(
+            node.id, node.type, node.expression, scope
+        )
+        scope.addSymbol(sv)
+        if node.rest is not None:
+            scope = node.rest.build_scope(self, scope=scope)
+        return scope
+
+    def buildScopeVarAssigment(self, node: ast.VarAssigment, scope):
+        if node.rest is not None:
+            scope = node.rest.build_scope(self, scope=scope)
+        return scope
+
+    def buildScopeNameExpression(self, node: ast.NameExpression, scope):
+        return scope
+
+    def buildScopeNumberExpression(self, node: ast.NumberExpression, scope):
+        return scope
+
+    def buildScopeEmpty(self, node: ast.Empty, scope):
+        return scope
+
+class TypeVisitor:
+
+    def checkTypeDefinition(self, node: ast.Definition, scope):
+        # Definition(contract, rest) -> None
+        node.contract.check_type(self, scope=scope)
+
+    def checkTypeContract(self, node: ast.Contract, scope):
+        # Contract(id, definition) -> None
+        node.definition.check_type(self, scope=scope)
+
+    def checkTypeFunction(self, node: ast.Function, scope):
+        # Function(function, rest) -> None
+        node.function.check_type(self, scope=scope)
+        if node.rest is not None:
+            node.rest.check_type(self, scope=scope)
+
+    def checkTypeGlobalVariableDefinition(self, node: ast.GlobalVariablesDeclaration, scope):
+        # GlobalVariablesDeclaration(variable, rest) -> None
+        if node.rest is not None:
+            node.rest.check_type(self, scope=scope)
+
+    def checkTypeGlobalConstantsDeclaration(self, node: ast.GlobalConstantsDeclaration, scope):
+        # GlobalConstantsDeclaration(constant, rest) -> None
+        node.constant.check_type(self, scope=scope)
+        if node.rest is not None:
+            node.rest.check_type(self, scope=scope)
+
+    def checkTypeGlobalConstant(self, node: ast.GlobalConstant, scope):
+        # GlobalConstant(id, type, value) -> None
+        if not self.is_valid_type(node.type, node.value):
+            raise Exception(f'Value of {node.id} is not {node.type}')
+
+    def checkTypeStructDeclaration(self, node: ast.StructDeclaration, scope):
+        # StructDeclaration(struct, rest) -> None
+        if node.rest is not None:
+            node.rest.check_type(self, scope=scope)
+
+    def checkTypeFunctionDefinition(self, node: ast.FunctionDefinition, scope):
+        # FunctionDefinition(id, args, returns, body) -> None
+        fs = scope._get_child_by_name(node.id)
+        ls = fs.childs[0]
+        node.body.check_type(self, scope=ls)
+
+    def checkTypeBinaryOperation(self, node: ast.BinaryOperation, scope):
+        # BinaryOperation(op, left, right) -> None
+        left_value = node.left.check_type(self, scope=scope)
+        right_value = node.right.check_type(self, scope=scope)
+        return self.solve_binary_type(node.op, left_value, right_value)
+
+    def checkTypeGroupExpression(self, node: ast.GroupExpression, scope):
+        # GroupExpression(expression) -> None
+        return self.check_type(node.expression)
+
+    def checkTypeReturnCode(self, node: ast.ReturnCode, scope):
+        # ReturnCode(expression) -> None
+        value = node.expression.check_type(self, scope=scope)
+        returns = scope.parent.returns
+        for ret in returns:
+            if not self.is_valid_type(ret, value):
+                raise Exception(f'Return type in function {scope.parent.name} is not correct')
+
+    def checkTypeVarDefinition(self, node: ast.VarDefinition, scope):
+        # VarDefinition(id, type, expression, rest) -> None
+        value = node.expression.check_type(self, scope=scope)
+        symbol = scope._get_symbol_by_name(node.id)
+        if not self.is_valid_type(symbol, value):
+            raise Exception(f'Value of {node.id} is not {symbol.type}')
+        if node.rest is not None:
+            node.rest.check_type(self, scope=scope)
+
+    def checkTypeVarAssigment(self, node: ast.VarAssigment, scope):
+        # VarAssigment(id, expression, rest) -> None
+        value = node.expression.check_type(self, scope=scope)
+        symbol = scope._get_symbol_by_name(node.id)
+        if not self.is_valid_type(symbol, value):
+            raise Exception(f'Value of {node.id} is not {value}')
+        if node.rest is not None:
+            node.rest.check_type(self, scope=scope)
+
+    def checkTypeNameExpression(self, node: ast.NameExpression, scope):
+        # NameExpression(name) -> None
+        return scope._get_symbol_by_name(node.name)
+
+    def checkTypeNumberExpression(self, node: ast.NumberExpression, scope):
+        # NumberExpression(sign, number) -> None
+        if node.sign == '-':
+            return UIntType
+        else:
+            return IntType
+
+    def checkTypeEmpty(self, node: ast.Empty, scope):
+        return scope
+
+    def is_valid_type(self, type, value):
+        return True
+
+    def solve_binary_type(self, op, left, right):
+        return IntType
 
 class Scope:
     def __init__(self, parent=None) -> None:

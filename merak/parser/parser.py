@@ -81,10 +81,32 @@ class MerakParser(Parser):
         | expression DIVIDE expression
         | LPAREN expression RPAREN
         | value
+        | call
 
     value:
         NUMBER
         | UMINUS NUMBER
+
+    call:
+        ID funcCall SEMICOLON
+        | ID structCall SEMICOLON
+
+    funcCall:
+        DOT LPAREN varList RPAREN funcCall
+        | empty
+
+    structCall:
+        DOT LPAREN LBRACE dict RBRACE RPAREN
+
+    dict:
+        ID COLON ID
+        | ID COLON ID COMMA dict
+        | empty
+
+    varList:
+        ID
+        | ID COMMA varList
+        | empty
 
     type: INT | UINT | BOOL
 
@@ -174,9 +196,9 @@ class MerakParser(Parser):
     def functionDefinition(self, p):
         if hasattr(p, "functionReturn"):
             return FunctionDefinition(
-                p.ID, p.functionArgs, p.functionReturn, p.functionCode
+                p.ID, p.functionArgs, p.functionReturn, p.functionTypes, p.functionCode
             )
-        return FunctionDefinition(p.ID, p.functionArgs, None, p.functionCode)
+        return FunctionDefinition(p.ID, p.functionArgs, None, p.functionTypes, p.functionCode)
 
     """
     functionArgs:
@@ -319,6 +341,41 @@ class MerakParser(Parser):
     def expression(self, p):
         return p[0]
 
+    @_("call")
+    def expression(self, p):
+        return p[0]
+
+    '''call:
+        ID funcCall SEMICOLON
+        | ID structCall SEMICOLON
+    '''
+    @_("ID structCall SEMICOLON")
+    def call(self, p):
+        if hasattr(p, "structCall"):
+            return StructCall(p.ID, p.structCall)
+
+    '''
+    structCall:
+        DOT LPAREN LBRACE dict RBRACE RPAREN
+    '''
+    @_("DOT LPAREN LBRACE dict RBRACE RPAREN")
+    def structCall(self, p):
+        if hasattr(p, "structCall"):
+            return p.dict
+
+    '''
+    dict:
+        ID COLON ID
+        | ID COLON ID COMMA dict
+        | empty
+    '''
+    def dict(self, p):
+        if hasattr(p, "dict"):
+            return DictEntry(p.ID0, p.ID1, p.dict)
+        if hasattr(p, "ID0"):
+            return DictEntry(p.ID0, p.ID1, None)
+
+        return Empty()
     """
     value:
         NUMBER

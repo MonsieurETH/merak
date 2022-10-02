@@ -1,9 +1,14 @@
+from py import code
 import pytest
+
+from merak.analyzers.symbolTableBuilder import SymbolTableBuilder
 
 from ..codegen import CodeGenerator
 
 from ..lexer import MerakLexer
 from ..parser import MerakParser
+
+# "Hello, world!".encode('utf-8').hex()
 
 test = """
     impl contrateto {
@@ -28,7 +33,7 @@ test = """
 
 def test_basic():
     text = """
-    impl contrateto {
+    impl contractName {
 
         struct Data {
             A: u256;
@@ -47,6 +52,11 @@ def test_basic():
 
     merakParser = MerakParser()
     tree = merakParser.parse(tokenized)
+
+    symbolTable = SymbolTableBuilder().build(tree)
+    codeIR = CodeGenerator()._code_gen(tree, scope=symbolTable.getScope())
+    print(codeIR)
+    a = 1
 
     # scopeEnv = ScopeBuilder().build(tree)
     # TypeChecker(scopeEnv).check(tree)

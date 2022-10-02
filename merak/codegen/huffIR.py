@@ -1,8 +1,8 @@
 from sha3 import keccak_256
 
 
-class Contract:
-    def __init__(self, functions=[], storage=[], interfaces=[]) -> None:
+class HuffContract:
+    def __init__(self, functions=[]) -> None:
         # TODO Create Code from function selectors
         code = "    0x00 calldataload 0xE0 shr \n"
         jumps = []
@@ -20,7 +20,7 @@ class Contract:
                 "    " + jump + ":\n" + "        " + jump.upper() + "()" + "\n"
             )
 
-        self.main = Function("MAIN", None, None, code)
+        self.main = HuffFunction("MAIN", [], [], None, code)
         self.functions = functions
 
     def __repr__(self) -> str:
@@ -32,26 +32,26 @@ class Contract:
 
         return main + "\n" + funcs
 
+class HuffGlobalVar:
 
-class Interface:
-    def __init__(self, selector, returns=None, modifiers=None) -> None:
-        self.selector = selector
-        self.returns = returns
-        self.modifiers = modifiers
+    def __init__(self, id, type) -> None:
+        self.id = id
+        self.type = type
 
-    def __repr__(self) -> str:
-        define = f"#define function {self.selector} "
-        define += " ".join(self.modifiers)
-        if self.returns is not None:
-            define += "returns ({self.returns})"
-        return define
+class HuffGlobalConst:
+
+    def __init__(self, id, type, value) -> None:
+        self.id = id
+        self.type = type
+        self.value = value
 
 
-class Function:
-    def __init__(self, id, args, returns, code) -> None:
+class HuffFunction:
+    def __init__(self, id, args, returns, types, code) -> None:
         self.id = id
         self.args = args
         self.returns = returns
+        self.types = types
         self.code = code
 
     @property
@@ -66,21 +66,15 @@ class Function:
             + " \n}"
         )
 
-
-class StorageSymbol:
-    def __init__(self, name, type, value) -> None:
-        self.name = name
-        self.type = type
-        self.value = value
-
-
-class Code:
-    def __init__(self, instructions=None) -> None:
-        if instructions is None:
-            instructions = []
-        self.instructions = instructions
+class Interface:
+    def __init__(self, selector, returns=None, modifiers=None) -> None:
+        self.selector = selector
+        self.returns = returns
+        self.modifiers = modifiers
 
     def __repr__(self) -> str:
-        insts = ""
-        for inst in self.instructions:
-            insts = insts + "\n" + repr(inst)
+        define = f"#define function {self.selector} "
+        define += " ".join(self.modifiers)
+        if self.returns is not None:
+            define += "returns ({self.returns})"
+        return define

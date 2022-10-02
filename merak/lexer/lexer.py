@@ -35,6 +35,7 @@ class MerakLexer(Lexer):
         STORAGE,
         CONST,
         STRUCT,
+        DOT,
     }
 
     # Tokens
@@ -53,6 +54,7 @@ class MerakLexer(Lexer):
     DIVIDE = r"/"
     ASSIGN = r"="
     NUMBER = r"\d+"
+    DOT = r"\."
 
     ID = r"[a-zA-Z_][a-zA-Z0-9_]*"
 
