@@ -1,0 +1,57 @@
+WHITESPACE = _{ " " | "\t" | "\n" | "\r" }
+COMMENT    = _{ "//" ~ (!"\n" ~ ANY)* }
+
+main = { SOI ~ contract ~ state_def* ~ EOI }
+
+contract        =  { "contract" ~ ident ~ "[" ~ bracket_content ~ "]" ~ "{" ~ inner_contract ~ "}" }
+bracket_content =  { state_list? }
+state_list      = _{ ident ~ ("," ~ ident)* }
+
+inner_contract = { (state_var | state_const)* ~ constructor? }
+
+state_var   = { "state var" ~ ident ~ ":" ~ _type ~ ("=" ~ expression)? ~ ";" }
+state_const = { "state const" ~ ident ~ ":" ~ _type ~ "=" ~ expression ~ ";" }
+constructor = { "constructor" ~ "(" ~ param_list? ~ ")" ~ "{" ~ block ~ "}" }
+
+state_def       = { contract_at_state ~ "(" ~ convenor ~ ")" ~ "{" ~ function* ~ "}" }
+function        = { visibility ~ modifiers* ~ ident ~ "(" ~ param_list? ~ ")" ~ function_return? ~ "{" ~ block ~ "}" }
+function_return = { "->" ~ param }
+convenor        = { (ident | address) }
+
+contract_at_state = { ident ~ "@" ~ ident }
+visibility        = { "function" | "entrypoint" }
+modifiers         = { "payable" | "stateful" }
+
+param_list = { param? ~ ("," ~ param)* }
+param      = { "{" ~ ident ~ ":" ~ _type ~ constraint? ~ "}" }
+constraint = { "|" ~ ident ~ comparison ~ expression }
+
+_type = { "int" | "address" | "bool" | "string" }
+
+block     = { statement* }
+statement = { expression ~ ";" | if_statement | while_statement | return_statement | assignment_statement | var_declaration | const_declaration }
+
+if_statement     = { "if" ~ "(" ~ expression ~ ")" ~ "{" ~ block ~ "}" ~ ("else" ~ "{" ~ block ~ "}")? }
+while_statement  = { "while" ~ "(" ~ expression ~ ")" ~ "{" ~ block ~ "}" }
+return_statement = { "return" ~ (expression ~ ";")? }
+// TODO return;
+assignment_statement = { ident ~ "=" ~ expression ~ ";" }
+var_declaration      = { "var" ~ ident ~ ":" ~ _type ~ ("=" ~ expression)? ~ ";" }
+const_declaration    = { "const" ~ ident ~ ":" ~ _type ~ "=" ~ expression ~ ";" }
+
+expression = { term ~ (binop ~ term)* }
+term       = { unop* ~ factor }
+factor     = { literal | ident | "(" ~ expression ~ ")" }
+literal    = { address | integer | decimal | string | boolean }
+binop      = { logical | comparison | arithmetic }
+logical    = { "&&" | "||" }
+comparison = { "==" | "!=" | "<=" | "<" | ">=" | ">" }
+arithmetic = { "+" | "-" | "*" | "/" | "%" }
+unop       = { "-" | "!" }
+
+integer = @{ ASCII_DIGIT+ }
+decimal = @{ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT* }
+ident   = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
+string  = @{ "'" ~ ("''" | (!"'" ~ ANY))* ~ "'" }
+address = @{ "0x" ~ ASCII_DIGIT{, 18} }
+boolean = @{ "true" | "false" }

@@ -1,0 +1,35 @@
+"
+contract Vault[Open, Full, Locked] {
+    state var owner: address;
+    state const balance: int = 0;
+
+    constructor({owner: address}) {
+        2;
+    }
+
+    Vault@Open(any) {
+        entrypoint stateful deposit({amount: int}) {
+            false;
+        }
+    }
+
+    Vault@Open(owner) {
+        function payable withdraw({amount: int}) {
+            if(balance > amount) {
+                balance = balance - amount;
+            } else {
+                balance = 0;
+            }
+        }
+
+        function getBalance() -> ({n: int}) {
+            return balance;
+        }
+    }
+
+    Vault@Full(any) {
+        entrypoint reduceOne() {
+            true;
+        }
+    }
+}"
