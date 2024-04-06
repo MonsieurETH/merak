@@ -29,12 +29,12 @@ jobs:
 
       - name: Lint
         run: |
-          cd phaser
+          cd merak
           cargo fmt -- --check
           cargo clippy -- -D warnings          
 
       - name: Test
         run: |
-          cd phaser
+          cd merak
           cargo check
           cargo test --all
