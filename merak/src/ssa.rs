@@ -29,7 +29,7 @@ impl SSANode {
     pub fn add_phi_param(&mut self, key: &str, param: &str) {
         self.phi_params
             .entry(key.to_string())
-            .or_insert(Vec::new())
+            .or_default()
             .push(param.to_string());
     }
 
@@ -59,8 +59,8 @@ impl From<&ControlFlowNode> for SSANode {
             statements: node.statements().clone(),
             condition: node.condition().clone(),
             node_type: node.node_type().clone(),
-            to_edges: node.to_edges().clone(),
-            from_edges: node.from_edges().clone(),
+            to_edges: node.edges_to().clone(),
+            from_edges: node.edges_from().clone(),
             phi_params: HashMap::new(),
         }
     }
@@ -84,8 +84,8 @@ impl From<ControlFlowGraph> for SSAGraph {
                 statements: node.statements().clone(),
                 condition: node.condition().clone(),
                 node_type: node.node_type().clone(),
-                to_edges: node.to_edges().clone(),
-                from_edges: node.from_edges().clone(),
+                to_edges: node.edges_to().clone(),
+                from_edges: node.edges_from().clone(),
                 phi_params: HashMap::new(),
             })
             .collect();
@@ -99,11 +99,7 @@ impl From<ControlFlowGraph> for SSAGraph {
             let mut visited: HashSet<usize> = HashSet::new();
 
             for node in &ssa_nodes {
-                if node
-                    .statements
-                    .iter()
-                    .any(|s| s.defines_variable(&variable))
-                {
+                if node.statements.iter().any(|s| s.defines_variable(variable)) {
                     worklist.insert(node.id);
                 }
             }
@@ -114,10 +110,10 @@ impl From<ControlFlowGraph> for SSAGraph {
                 visited.insert(node_id);
 
                 for df in dominance_frontiers[&node_id].iter() {
-                    if !visited.contains(&df) {
+                    if !visited.contains(df) {
                         let df_index = ssa_nodes.iter().position(|n| n.id == *df).unwrap();
                         ssa_nodes[df_index].init_phi_params(variable);
-                        if !worklist.contains(&df) {
+                        if !worklist.contains(df) {
                             worklist.insert(*df);
                         }
                     }
@@ -191,10 +187,7 @@ impl From<ControlFlowGraph> for SSAGraph {
 fn rename_statement(statement: &Statement, variable_map: &mut HashMap<String, usize>) -> Statement {
     let new_statement = match statement {
         Statement::VarDeclaration(name, ty, expr) => {
-            let new_expr = match expr {
-                Some(e) => Some(e.index_vars(&variable_map)),
-                None => None,
-            };
+            let new_expr = expr.as_ref().map(|e| e.index_vars(variable_map));
             let mut last_index = 0;
             variable_map
                 .entry(name.to_string())
@@ -206,7 +199,7 @@ fn rename_statement(statement: &Statement, variable_map: &mut HashMap<String, us
             Statement::VarDeclaration(format!("{}_{}", name, last_index), ty.clone(), new_expr)
         }
         Statement::VarAssignment(name, expr) => {
-            let new_expr = expr.index_vars(&variable_map);
+            let new_expr = expr.index_vars(variable_map);
             let mut last_index = 0;
             variable_map
                 .entry(name.to_string())
@@ -218,7 +211,7 @@ fn rename_statement(statement: &Statement, variable_map: &mut HashMap<String, us
             Statement::VarAssignment(format!("{}_{}", name, last_index), new_expr)
         }
         Statement::ConstDeclaration(name, ty, expr) => {
-            let new_expr = expr.index_vars(&variable_map);
+            let new_expr = expr.index_vars(variable_map);
             //let last_index = variable_map.get(name).unwrap();
             let mut last_index = 0;
             variable_map
@@ -231,7 +224,7 @@ fn rename_statement(statement: &Statement, variable_map: &mut HashMap<String, us
             Statement::ConstDeclaration(format!("{}_{}", name, last_index), ty.clone(), new_expr)
         }
         Statement::If(cond, true_branch, false_branch) => {
-            let new_cond = cond.index_vars(&variable_map);
+            let new_cond = cond.index_vars(variable_map);
             let new_true_branch: Vec<Statement> = true_branch
                 .iter()
                 .map(|s| rename_statement(s, variable_map))
@@ -246,7 +239,7 @@ fn rename_statement(statement: &Statement, variable_map: &mut HashMap<String, us
             Statement::If(new_cond, new_true_branch, new_false_branch)
         }
         Statement::While(cond, while_body) => {
-            let new_cond = cond.index_vars(&variable_map);
+            let new_cond = cond.index_vars(variable_map);
             let new_while_body: Vec<Statement> = while_body
                 .iter()
                 .map(|s| rename_statement(s, variable_map))
@@ -254,11 +247,11 @@ fn rename_statement(statement: &Statement, variable_map: &mut HashMap<String, us
             Statement::While(new_cond, new_while_body)
         }
         Statement::Return(Some(expr)) => {
-            let new_expr = expr.index_vars(&variable_map);
+            let new_expr = expr.index_vars(variable_map);
             Statement::Return(Some(new_expr))
         }
         Statement::Return(None) => Statement::Return(None),
-        Statement::Expression(expr) => Statement::Expression(expr.index_vars(&variable_map)),
+        Statement::Expression(expr) => Statement::Expression(expr.index_vars(variable_map)),
     };
 
     new_statement

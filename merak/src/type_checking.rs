@@ -440,7 +440,7 @@ impl TypeChecker {
                     unimplemented!("Type mismatch");
                 }
             }
-            Statement::While(expr, stmts) => {
+            Statement::While(_expr, _stmts) => {
                 //if let Some(constraint) = while_stmts.get_constraint() {
                 //    constrains.push(constraint);
                 //}
@@ -522,15 +522,13 @@ impl TypeChecker {
             Expression::Literal(literal) => match literal {
                 Literal::Bool(b) => AstZ3::Bool(Bool::from_bool(&self.z3_context, *b)),
                 Literal::Int(i) => AstZ3::Int(Int::from_i64(&self.z3_context, *i)),
-                Literal::String(s) => {
-                    AstZ3::String(String::from_str(&self.z3_context, &s).unwrap())
-                }
+                Literal::String(s) => AstZ3::String(String::from_str(&self.z3_context, s).unwrap()),
                 Literal::Address(a) => {
-                    AstZ3::String(String::from_str(&self.z3_context, &a).unwrap())
+                    AstZ3::String(String::from_str(&self.z3_context, a).unwrap())
                 }
             },
             Expression::Identifier(name) => {
-                let symbol = self.environment.locate_symbol(&name).unwrap();
+                let symbol = self.environment.locate_symbol(name).unwrap();
                 match symbol.get_type() {
                     Type::Bool => AstZ3::Bool(Bool::new_const(&self.z3_context, name.clone())),
                     Type::Int => AstZ3::Int(Int::new_const(&self.z3_context, name.clone())),

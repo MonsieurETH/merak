@@ -30,7 +30,7 @@ fn main() {
     .unwrap();
 
     let mut tc = TypeChecker::new();
-    let env = tc.check_program(&ast);
+    let _env = tc.check_program(&ast);
 
     //println!("{:#?}", ast)
 }

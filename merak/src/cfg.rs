@@ -1,12 +1,9 @@
 use std::{
     collections::{BTreeSet, HashMap, HashSet},
-    error::Error,
     hash::Hash,
 };
 
-use crate::ast::{
-    BinaryOperator, Block, Expression, Function, Literal, Program, Statement, UnaryOperator,
-};
+use crate::ast::{BinaryOperator, Block, Expression, Literal, Program, Statement, UnaryOperator};
 
 pub struct FunctionsCFG {
     functions: HashMap<String, ControlFlowGraph>,
@@ -270,9 +267,8 @@ impl ControlFlowGraph {
     }
 
     pub fn calculate_dominators(&mut self) {
-        match self.dominators {
-            Some(_) => return,
-            None => {}
+        if self.dominators.is_some() {
+            return;
         }
         let mut dominators = HashMap::new();
 
@@ -429,11 +425,11 @@ impl ControlFlowNode {
         &self.condition
     }
 
-    pub fn to_edges(&self) -> &BTreeSet<usize> {
+    pub fn edges_to(&self) -> &BTreeSet<usize> {
         &self.to_edges
     }
 
-    pub fn from_edges(&self) -> &BTreeSet<usize> {
+    pub fn edges_from(&self) -> &BTreeSet<usize> {
         &self.from_edges
     }
 
@@ -482,9 +478,9 @@ impl ControlFlowNode {
                             let old_value = var2num.get(var).unwrap();
                             let new_expr = num2expr.get(*old_value).unwrap();
                             if !num2var.contains_key(old_value) {
-                                num2var.insert(old_value.clone(), name.clone());
+                                num2var.insert(*old_value, name.clone());
                             }
-                            var2num.insert(name.to_string(), old_value.clone());
+                            var2num.insert(name.to_string(), *old_value);
 
                             new_statements.push(Statement::VarDeclaration(
                                 name.clone(),
@@ -496,9 +492,7 @@ impl ControlFlowNode {
                             let value = num2expr.len();
                             num2expr.push(expr.clone());
                             var2num.insert(name.clone(), value);
-                            if !num2var.contains_key(&value) {
-                                num2var.insert(value.clone(), var.clone());
-                            }
+                            num2var.entry(value).or_insert_with(|| var.clone());
                             new_statements.push(Statement::VarDeclaration(
                                 name.clone(),
                                 ty.clone(),
@@ -508,15 +502,13 @@ impl ControlFlowNode {
                         continue;
                     }
 
-                    let num_expr = exp2numbering(&expr, &mut var2num);
+                    let num_expr = exp2numbering(expr, &mut var2num);
 
                     if table.contains_key(&num_expr) {
                         let inserted_name = table.get(&num_expr).unwrap();
                         let old_value = var2num.get(inserted_name).unwrap();
-                        if !num2var.contains_key(old_value) {
-                            num2var.insert(old_value.clone(), name.clone());
-                        }
-                        var2num.insert(name.clone(), old_value.clone());
+                        num2var.entry(*old_value).or_insert_with(|| name.clone());
+                        var2num.insert(name.clone(), *old_value);
                         new_statements.push(Statement::VarDeclaration(
                             name.clone(),
                             ty.clone(),
@@ -527,9 +519,7 @@ impl ControlFlowNode {
                         table.insert(num_expr.clone(), name.clone());
                         let value = table.len() - 1;
                         var2num.insert(name.clone(), value);
-                        if !num2var.contains_key(&value) {
-                            num2var.insert(value, name.clone());
-                        }
+                        num2var.entry(value).or_insert_with(|| name.clone());
                         let expr_nums = numbering2exp(&num_expr, &num2var);
                         match expr_nums {
                             Ok(exprn) => new_statements.push(Statement::VarDeclaration(
@@ -543,14 +533,12 @@ impl ControlFlowNode {
                 }
                 Statement::ConstDeclaration(name, ty, expr) => {
                     num2expr.push(expr.clone());
-                    let num_expr = exp2numbering(&expr, &mut var2num);
+                    let num_expr = exp2numbering(expr, &mut var2num);
                     if table.contains_key(&num_expr) {
                         let inserted_name = table.get(&num_expr).unwrap();
                         let old_value = var2num.get(inserted_name).unwrap();
-                        if !num2var.contains_key(old_value) {
-                            num2var.insert(old_value.clone(), name.clone());
-                        }
-                        var2num.insert(name.clone(), old_value.clone());
+                        num2var.entry(*old_value).or_insert_with(|| name.clone());
+                        var2num.insert(name.clone(), *old_value);
 
                         new_statements.push(Statement::ConstDeclaration(
                             name.clone(),
@@ -562,9 +550,7 @@ impl ControlFlowNode {
                         table.insert(num_expr.clone(), name.clone());
                         let value = table.len() - 1;
                         var2num.insert(name.clone(), value);
-                        if !num2var.contains_key(&value) {
-                            num2var.insert(value, name.clone());
-                        }
+                        num2var.entry(value).or_insert_with(|| name.clone());
                         let expr_nums = numbering2exp(&num_expr, &num2var);
                         match expr_nums {
                             Ok(exprn) => new_statements.push(Statement::ConstDeclaration(
@@ -577,7 +563,7 @@ impl ControlFlowNode {
                     }
                 }
                 Statement::Return(Some(expr)) => {
-                    let num_expr = exp2numbering(&expr, &mut var2num);
+                    let num_expr = exp2numbering(expr, &mut var2num);
                     let expr_nums = numbering2exp(&num_expr, &num2var);
                     match expr_nums {
                         Ok(exprn) => new_statements.push(Statement::Return(Some(exprn))),

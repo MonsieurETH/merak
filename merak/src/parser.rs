@@ -9,7 +9,7 @@ use pest_derive::Parser;
 #[grammar = "merak.pest"]
 pub struct MerakParser;
 
-pub fn parse(input: &str) -> Result<Program, pest::error::Error<Rule>> {
+pub fn parse(input: &str) -> Result<Program, Box<pest::error::Error<Rule>>> {
     let main = MerakParser::parse(Rule::main, input)?;
     let mut program = Program::new();
     let pairs = main.into_iter().next().unwrap().into_inner();
@@ -30,7 +30,9 @@ pub fn parse(input: &str) -> Result<Program, pest::error::Error<Rule>> {
     Ok(program)
 }
 
-fn parse_contract(pair: pest::iterators::Pair<Rule>) -> Result<Contract, pest::error::Error<Rule>> {
+fn parse_contract(
+    pair: pest::iterators::Pair<Rule>,
+) -> Result<Contract, Box<pest::error::Error<Rule>>> {
     let mut contract = Contract::new();
     for pair in pair.into_inner() {
         match pair.as_rule() {
@@ -73,7 +75,7 @@ fn parse_contract(pair: pest::iterators::Pair<Rule>) -> Result<Contract, pest::e
 
 fn parse_state_data(
     pair: pest::iterators::Pair<Rule>,
-) -> Result<ContractStateData, pest::error::Error<Rule>> {
+) -> Result<ContractStateData, Box<pest::error::Error<Rule>>> {
     let mut state_data = ContractStateData::new();
 
     let is_constant = match pair.as_rule() {
@@ -106,7 +108,7 @@ fn parse_state_data(
 
 fn parse_constructor(
     pair: pest::iterators::Pair<Rule>,
-) -> Result<ContractConstructor, pest::error::Error<Rule>> {
+) -> Result<ContractConstructor, Box<pest::error::Error<Rule>>> {
     let mut constructor = ContractConstructor::new();
     for inner_pair in pair.into_inner() {
         match inner_pair.as_rule() {
@@ -135,7 +137,7 @@ fn parse_constructor(
 
 fn parse_state_def(
     pair: pest::iterators::Pair<Rule>,
-) -> Result<ContractState, pest::error::Error<Rule>> {
+) -> Result<ContractState, Box<pest::error::Error<Rule>>> {
     let mut state_def = ContractState::new();
     for inner_pair in pair.into_inner() {
         match inner_pair.as_rule() {
@@ -160,7 +162,7 @@ fn parse_state_def(
 
 fn parse_function(
     pair: pest::iterators::Pair<Rule>,
-) -> Result<ContractFunction, pest::error::Error<Rule>> {
+) -> Result<ContractFunction, Box<pest::error::Error<Rule>>> {
     let mut function = ContractFunction::new();
     for inner_pair in pair.into_inner() {
         match inner_pair.as_rule() {
@@ -210,7 +212,7 @@ fn parse_function(
 
 fn parse_param(
     pair: pest::iterators::Pair<Rule>,
-) -> Result<FunctionParameter, pest::error::Error<Rule>> {
+) -> Result<FunctionParameter, Box<pest::error::Error<Rule>>> {
     let mut param = FunctionParameter::new();
     for inner_pair in pair.into_inner() {
         match inner_pair.as_rule() {
@@ -241,7 +243,7 @@ fn parse_param(
 
 fn parse_block(
     pair: pest::iterators::Pair<Rule>,
-) -> Result<Vec<Statement>, pest::error::Error<Rule>> {
+) -> Result<Vec<Statement>, Box<pest::error::Error<Rule>>> {
     let mut block: Vec<Statement> = vec![];
     for inner_pair in pair.into_inner() {
         match inner_pair.as_rule() {
@@ -258,7 +260,7 @@ fn parse_block(
 
 fn parse_statement(
     pair: pest::iterators::Pair<Rule>,
-) -> Result<Statement, pest::error::Error<Rule>> {
+) -> Result<Statement, Box<pest::error::Error<Rule>>> {
     let pair = pair.into_inner().next().unwrap();
     let statement = match pair.as_rule() {
         Rule::expression => {
@@ -317,7 +319,7 @@ fn parse_statement(
 
 fn parse_expression(
     pair: pest::iterators::Pair<Rule>,
-) -> Result<Expression, pest::error::Error<Rule>> {
+) -> Result<Expression, Box<pest::error::Error<Rule>>> {
     println!("{:?}", pair.as_rule());
     match pair.as_rule() {
         Rule::expression => {
@@ -366,7 +368,7 @@ fn parse_expression(
 
 fn parse_literal(
     pair: pest::iterators::Pair<Rule>,
-) -> Result<Expression, pest::error::Error<Rule>> {
+) -> Result<Expression, Box<pest::error::Error<Rule>>> {
     let inner = pair.into_inner().next().unwrap();
     Ok(Expression::Literal(inner.as_str().into()))
 }
