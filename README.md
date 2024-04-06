@@ -2,9 +2,10 @@
 
 **Attention: Merak is still in alpha development, and is not ready to be used in production (don't worry, it does not produce any bytecode yet). Breaking changes are expected!**
 
-Merak is an experimental programming language for the EVM based on [Liquid Types](https://goto.ucsd.edu/~rjhala/liquid/liquid_types.pdf) (Logically Qualified Data Types) and [Typestate](https://ieeexplore.ieee.org/document/6312929).
+Merak is an experimental programming language for the EVM based on [Liquid Types](https://goto.ucsd.edu/~rjhala/liquid/liquid_types.pdf) (Logically Qualified Data Types) and [Typestate](https://ieeexplore.ieee.org/document/6312929), linear types to represent assets and a system of mandatory users and privileges.
 
-The main goal of Merak, apart from being a side project that I find really fun, is to explore ideas that can improve the reliability of smart contracts in EVM.
+
+The main goal of Merak, apart from being a side project that I find really fun, is to explore ideas that can improve the reliability of smart contracts in EVM. It's to be expected that the code will be messy, not idiomatically correct and not performant.
 
 ### Liquid types
 
