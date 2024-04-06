@@ -587,6 +587,49 @@ impl ControlFlowNode {
                 _ => new_statements.push(statement.clone()),
             }
         }
+        self.statements = new_statements;
+        self.dead_code_elimination();
+    }
+
+    fn dead_code_elimination(&mut self) {
+        let mut used = HashSet::new();
+        let mut new_statements = Vec::new();
+
+        for statement in self.statements() {
+            used.extend(statement.used_vars());
+        }
+
+        for statement in self.statements() {
+            match statement {
+                Statement::VarDeclaration(name, ty, Some(expr)) => {
+                    if used.contains(name) {
+                        new_statements.push(Statement::VarDeclaration(
+                            name.clone(),
+                            ty.clone(),
+                            Some(expr.clone()),
+                        ));
+                    }
+                }
+                Statement::VarAssignment(name, expr) => {
+                    if used.contains(name) {
+                        new_statements.push(Statement::VarAssignment(name.clone(), expr.clone()));
+                    }
+                }
+                Statement::ConstDeclaration(name, ty, expr) => {
+                    if used.contains(name) {
+                        new_statements.push(Statement::ConstDeclaration(
+                            name.clone(),
+                            ty.clone(),
+                            expr.clone(),
+                        ));
+                    }
+                }
+                Statement::Return(Some(expr)) => {
+                    new_statements.push(Statement::Return(Some(expr.clone())));
+                }
+                _ => new_statements.push(statement.clone()),
+            }
+        }
 
         self.statements = new_statements;
     }
@@ -1823,11 +1866,6 @@ mod tests {
                     )),
                 ),
                 Statement::VarDeclaration(
-                    "sum2".to_string(),
-                    Type::Int,
-                    Some(Expression::Identifier("sum1".to_string())),
-                ),
-                Statement::VarDeclaration(
                     "prod".to_string(),
                     Type::Int,
                     Some(Expression::BinaryOp(
@@ -1883,21 +1921,6 @@ mod tests {
                     Type::Int,
                     Some(Expression::Literal(Literal::Int(4))),
                 ),
-                Statement::VarDeclaration(
-                    "copy1".to_string(),
-                    Type::Int,
-                    Some(Expression::Literal(Literal::Int(4))),
-                ),
-                Statement::VarDeclaration(
-                    "copy2".to_string(),
-                    Type::Int,
-                    Some(Expression::Literal(Literal::Int(4))),
-                ),
-                Statement::VarDeclaration(
-                    "copy3".to_string(),
-                    Type::Int,
-                    Some(Expression::Literal(Literal::Int(4))),
-                ),
                 Statement::Return(Some(Expression::Identifier("x".to_string()))),
             ],
             condition: None,
@@ -1939,29 +1962,9 @@ mod tests {
 
         let expected = ControlFlowNode {
             id: 0,
-            statements: vec![
-                Statement::VarDeclaration(
-                    "x".to_string(),
-                    Type::Int,
-                    Some(Expression::Identifier("y".to_string())),
-                ),
-                Statement::VarDeclaration(
-                    "copy1".to_string(),
-                    Type::Int,
-                    Some(Expression::Identifier("y".to_string())),
-                ),
-                Statement::VarDeclaration(
-                    "copy2".to_string(),
-                    Type::Int,
-                    Some(Expression::Identifier("y".to_string())),
-                ),
-                Statement::VarDeclaration(
-                    "copy3".to_string(),
-                    Type::Int,
-                    Some(Expression::Identifier("y".to_string())),
-                ),
-                Statement::Return(Some(Expression::Identifier("y".to_string()))),
-            ],
+            statements: vec![Statement::Return(Some(Expression::Identifier(
+                "y".to_string(),
+            )))],
             condition: None,
             node_type: NodeType::Normal,
             to_edges: BTreeSet::new(),
@@ -2008,11 +2011,6 @@ mod tests {
                         BinaryOperator::Add,
                         Box::new(Expression::Identifier("y".to_string())),
                     )),
-                ),
-                Statement::VarDeclaration(
-                    "sum2".to_string(),
-                    Type::Int,
-                    Some(Expression::Identifier("sum1".to_string())),
                 ),
                 Statement::Return(Some(Expression::Identifier("sum1".to_string()))),
             ],
