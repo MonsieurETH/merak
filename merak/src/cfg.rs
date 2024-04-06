@@ -1,9 +1,12 @@
 use std::{
     collections::{BTreeSet, HashMap, HashSet},
+    error::Error,
     hash::Hash,
 };
 
-use crate::ast::{Block, Expression, Function, Program, Statement};
+use crate::ast::{
+    BinaryOperator, Block, Expression, Function, Literal, Program, Statement, UnaryOperator,
+};
 
 pub struct FunctionsCFG {
     functions: HashMap<String, ControlFlowGraph>,
@@ -402,6 +405,10 @@ impl ControlFlowNode {
         self.statements.push(statement);
     }
 
+    pub fn remove_statement(&mut self, index: usize) {
+        self.statements.remove(index);
+    }
+
     pub fn add_to_edge(&mut self, edge: usize) {
         self.to_edges.insert(edge);
     }
@@ -456,6 +463,224 @@ impl ControlFlowNode {
             }
         }
         false
+    }
+
+    pub fn local_value_numbering(&mut self) {
+        let mut table: HashMap<NumberingEntry, String> = HashMap::new();
+        let mut num2expr: Vec<Expression> = Vec::new();
+        let mut var2num: HashMap<String, usize> = HashMap::new();
+        let mut num2var: HashMap<usize, String> = HashMap::new();
+        let mut new_statements = Vec::new();
+
+        for statement in self.statements() {
+            match statement {
+                Statement::VarDeclaration(name, ty, Some(expr)) => {
+                    // Id operation (in var declaration)
+                    if let Expression::Identifier(var) = expr {
+                        //TODO is_identifier (inside subs, (((()))), etc)
+                        if var2num.contains_key(var) {
+                            let old_value = var2num.get(var).unwrap();
+                            let new_expr = num2expr.get(*old_value).unwrap();
+                            if !num2var.contains_key(old_value) {
+                                num2var.insert(old_value.clone(), name.clone());
+                            }
+                            var2num.insert(name.to_string(), old_value.clone());
+
+                            new_statements.push(Statement::VarDeclaration(
+                                name.clone(),
+                                ty.clone(),
+                                Some(new_expr.clone()),
+                            ));
+                        } else {
+                            //var is paramenter and never used before
+                            let value = num2expr.len();
+                            num2expr.push(expr.clone());
+                            var2num.insert(name.clone(), value);
+                            if !num2var.contains_key(&value) {
+                                num2var.insert(value.clone(), var.clone());
+                            }
+                            new_statements.push(Statement::VarDeclaration(
+                                name.clone(),
+                                ty.clone(),
+                                Some(Expression::Identifier(var.clone())),
+                            ));
+                        }
+                        continue;
+                    }
+
+                    let num_expr = exp2numbering(&expr, &mut var2num);
+
+                    if table.contains_key(&num_expr) {
+                        let inserted_name = table.get(&num_expr).unwrap();
+                        let old_value = var2num.get(inserted_name).unwrap();
+                        if !num2var.contains_key(old_value) {
+                            num2var.insert(old_value.clone(), name.clone());
+                        }
+                        var2num.insert(name.clone(), old_value.clone());
+                        new_statements.push(Statement::VarDeclaration(
+                            name.clone(),
+                            ty.clone(),
+                            Some(Expression::Identifier(inserted_name.clone())),
+                        ));
+                    } else {
+                        num2expr.push(expr.clone());
+                        table.insert(num_expr.clone(), name.clone());
+                        let value = table.len() - 1;
+                        var2num.insert(name.clone(), value);
+                        if !num2var.contains_key(&value) {
+                            num2var.insert(value, name.clone());
+                        }
+                        let expr_nums = numbering2exp(&num_expr, &num2var);
+                        match expr_nums {
+                            Ok(exprn) => new_statements.push(Statement::VarDeclaration(
+                                name.clone(),
+                                ty.clone(),
+                                Some(exprn),
+                            )),
+                            Err(_) => new_statements.push(statement.clone()),
+                        }
+                    }
+                }
+                Statement::ConstDeclaration(name, ty, expr) => {
+                    num2expr.push(expr.clone());
+                    let num_expr = exp2numbering(&expr, &mut var2num);
+                    if table.contains_key(&num_expr) {
+                        let inserted_name = table.get(&num_expr).unwrap();
+                        let old_value = var2num.get(inserted_name).unwrap();
+                        if !num2var.contains_key(old_value) {
+                            num2var.insert(old_value.clone(), name.clone());
+                        }
+                        var2num.insert(name.clone(), old_value.clone());
+
+                        new_statements.push(Statement::ConstDeclaration(
+                            name.clone(),
+                            ty.clone(),
+                            Expression::Identifier(inserted_name.clone()),
+                        ));
+                    } else {
+                        num2expr.push(expr.clone());
+                        table.insert(num_expr.clone(), name.clone());
+                        let value = table.len() - 1;
+                        var2num.insert(name.clone(), value);
+                        if !num2var.contains_key(&value) {
+                            num2var.insert(value, name.clone());
+                        }
+                        let expr_nums = numbering2exp(&num_expr, &num2var);
+                        match expr_nums {
+                            Ok(exprn) => new_statements.push(Statement::ConstDeclaration(
+                                name.clone(),
+                                ty.clone(),
+                                exprn,
+                            )),
+                            Err(_) => new_statements.push(statement.clone()),
+                        }
+                    }
+                }
+                Statement::Return(Some(expr)) => {
+                    let num_expr = exp2numbering(&expr, &mut var2num);
+                    let expr_nums = numbering2exp(&num_expr, &num2var);
+                    match expr_nums {
+                        Ok(exprn) => new_statements.push(Statement::Return(Some(exprn))),
+                        Err(_) => new_statements.push(statement.clone()),
+                    }
+                }
+                _ => new_statements.push(statement.clone()),
+            }
+        }
+
+        self.statements = new_statements;
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+pub enum NumberingEntry {
+    Value(Literal),
+    Var(usize),
+    BinaryOp(BinaryOperator, Box<NumberingEntry>, Box<NumberingEntry>),
+    UnaryOp(UnaryOperator, Box<NumberingEntry>),
+}
+
+fn exp2numbering(expr: &Expression, var2num: &mut HashMap<String, usize>) -> NumberingEntry {
+    fn ordered_exp2numbering(
+        expr: &Expression,
+        var2num: &mut HashMap<String, usize>,
+    ) -> (NumberingEntry, usize) {
+        match expr {
+            Expression::BinaryOp(left, op, right) => {
+                let (left_expr, left_num) = ordered_exp2numbering(left, var2num);
+                let (right_expr, right_num) = ordered_exp2numbering(right, var2num);
+
+                if left_num <= right_num {
+                    (
+                        NumberingEntry::BinaryOp(
+                            op.clone(),
+                            Box::new(left_expr),
+                            Box::new(right_expr),
+                        ),
+                        left_num,
+                    )
+                } else {
+                    (
+                        NumberingEntry::BinaryOp(
+                            op.clone(),
+                            Box::new(right_expr),
+                            Box::new(left_expr),
+                        ),
+                        right_num,
+                    )
+                }
+            }
+            Expression::Identifier(name) => {
+                if var2num.contains_key(name) {
+                    (
+                        NumberingEntry::Var(*var2num.get(name).unwrap()),
+                        *var2num.get(name).unwrap(),
+                    )
+                } else {
+                    let num = var2num.values().max().unwrap_or(&0) + 1;
+                    var2num.insert(name.clone(), num);
+                    (NumberingEntry::Var(num), num)
+                }
+            }
+            Expression::Literal(literal) => match literal {
+                Literal::Bool(_) => (NumberingEntry::Value(literal.clone()), 0),
+                Literal::Int(_) => (NumberingEntry::Value(literal.clone()), 0),
+                Literal::Address(_) => (NumberingEntry::Value(literal.clone()), 0),
+                Literal::String(_) => (NumberingEntry::Value(literal.clone()), 0),
+            },
+            Expression::UnaryOp(op, expr) => {
+                let (expr, num) = ordered_exp2numbering(expr, var2num);
+                (NumberingEntry::UnaryOp(op.clone(), Box::new(expr)), num)
+            }
+        }
+    }
+
+    let (numbering_entry, _) = ordered_exp2numbering(expr, var2num);
+    numbering_entry
+}
+
+fn numbering2exp(
+    entry: &NumberingEntry,
+    num2var: &HashMap<usize, String>,
+) -> Result<Expression, String> {
+    match entry {
+        NumberingEntry::Value(literal) => Ok(Expression::Literal(literal.clone())),
+        NumberingEntry::Var(num) => {
+            if num2var.contains_key(num) {
+                Ok(Expression::Identifier(num2var.get(num).unwrap().clone()))
+            } else {
+                Err("Variable not found".to_string())
+            }
+        }
+        NumberingEntry::BinaryOp(op, left, right) => Ok(Expression::BinaryOp(
+            Box::new(numbering2exp(left, num2var)?),
+            op.clone(),
+            Box::new(numbering2exp(right, num2var)?),
+        )),
+        NumberingEntry::UnaryOp(op, expr) => Ok(Expression::UnaryOp(
+            op.clone(),
+            Box::new(numbering2exp(expr, num2var)?),
+        )),
     }
 }
 
@@ -1544,5 +1769,259 @@ mod tests {
         .collect();
 
         assert_eq!(dominance_frontier, expected);
+    }
+
+    #[test]
+    fn test_local_value_numbering() {
+        let ast = parse(
+            "
+            contract Vault[Open, Full, Locked] {
+                constructor() {
+                    var a: int = 4;
+                    var b: int = 2;
+                    var sum1: int = a + b;
+                    var sum2: int = a + b;
+                    var prod: int = sum1 * sum2;
+                    return prod;
+                }
+            }",
+        )
+        .unwrap();
+
+        let mut tc = TypeChecker::new();
+        let _env = tc.check_program(&ast);
+
+        let mut cfg = FunctionsCFG::new();
+        cfg.parse_program(&ast);
+
+        let function_cfg: &mut ControlFlowGraph = cfg.get_mut("constructor").unwrap();
+
+        assert!(function_cfg.nodes.len() == 1);
+        let mut node = function_cfg.nodes.get_mut(0).unwrap();
+        node.local_value_numbering();
+
+        let expected = ControlFlowNode {
+            id: 0,
+            statements: vec![
+                Statement::VarDeclaration(
+                    "a".to_string(),
+                    Type::Int,
+                    Some(Expression::Literal(Literal::Int(4))),
+                ),
+                Statement::VarDeclaration(
+                    "b".to_string(),
+                    Type::Int,
+                    Some(Expression::Literal(Literal::Int(2))),
+                ),
+                Statement::VarDeclaration(
+                    "sum1".to_string(),
+                    Type::Int,
+                    Some(Expression::BinaryOp(
+                        Box::new(Expression::Identifier("a".to_string())),
+                        BinaryOperator::Add,
+                        Box::new(Expression::Identifier("b".to_string())),
+                    )),
+                ),
+                Statement::VarDeclaration(
+                    "sum2".to_string(),
+                    Type::Int,
+                    Some(Expression::Identifier("sum1".to_string())),
+                ),
+                Statement::VarDeclaration(
+                    "prod".to_string(),
+                    Type::Int,
+                    Some(Expression::BinaryOp(
+                        Box::new(Expression::Identifier("sum1".to_string())),
+                        BinaryOperator::Mul,
+                        Box::new(Expression::Identifier("sum1".to_string())),
+                    )),
+                ),
+                Statement::Return(Some(Expression::Identifier("prod".to_string()))),
+            ],
+            condition: None,
+            node_type: NodeType::Normal,
+            to_edges: BTreeSet::new(),
+            from_edges: BTreeSet::new(),
+        };
+
+        assert_eq!(node, &expected);
+    }
+
+    #[test]
+    fn test_local_value_numbering_const_propagation() {
+        let ast = parse(
+            "
+            contract Vault[Open, Full, Locked] {
+                constructor() {
+                    var x: int = 4;
+                    var copy1: int = x;
+                    var copy2: int = copy1;
+                    var copy3: int = copy2;
+                    return copy3;
+                }
+            }",
+        )
+        .unwrap();
+
+        let mut tc = TypeChecker::new();
+        let _env = tc.check_program(&ast);
+
+        let mut cfg = FunctionsCFG::new();
+        cfg.parse_program(&ast);
+
+        let function_cfg: &mut ControlFlowGraph = cfg.get_mut("constructor").unwrap();
+
+        assert!(function_cfg.nodes.len() == 1);
+        let mut node = function_cfg.nodes.get_mut(0).unwrap();
+        node.local_value_numbering();
+
+        let expected = ControlFlowNode {
+            id: 0,
+            statements: vec![
+                Statement::VarDeclaration(
+                    "x".to_string(),
+                    Type::Int,
+                    Some(Expression::Literal(Literal::Int(4))),
+                ),
+                Statement::VarDeclaration(
+                    "copy1".to_string(),
+                    Type::Int,
+                    Some(Expression::Literal(Literal::Int(4))),
+                ),
+                Statement::VarDeclaration(
+                    "copy2".to_string(),
+                    Type::Int,
+                    Some(Expression::Literal(Literal::Int(4))),
+                ),
+                Statement::VarDeclaration(
+                    "copy3".to_string(),
+                    Type::Int,
+                    Some(Expression::Literal(Literal::Int(4))),
+                ),
+                Statement::Return(Some(Expression::Identifier("x".to_string()))),
+            ],
+            condition: None,
+            node_type: NodeType::Normal,
+            to_edges: BTreeSet::new(),
+            from_edges: BTreeSet::new(),
+        };
+
+        assert_eq!(node, &expected);
+    }
+
+    #[test]
+    fn test_local_value_numbering_copy_propagation() {
+        let ast = parse(
+            "
+            contract Vault[Open, Full, Locked] {
+                constructor({y:int}) {
+                    var x: int = y;
+                    var copy1: int = x;
+                    var copy2: int = copy1;
+                    var copy3: int = copy2;
+                    return copy3;
+                }
+            }",
+        )
+        .unwrap();
+
+        let mut tc = TypeChecker::new();
+        let _env = tc.check_program(&ast);
+
+        let mut cfg = FunctionsCFG::new();
+        cfg.parse_program(&ast);
+
+        let function_cfg: &mut ControlFlowGraph = cfg.get_mut("constructor").unwrap();
+
+        assert!(function_cfg.nodes.len() == 1);
+        let mut node = function_cfg.nodes.get_mut(0).unwrap();
+        node.local_value_numbering();
+
+        let expected = ControlFlowNode {
+            id: 0,
+            statements: vec![
+                Statement::VarDeclaration(
+                    "x".to_string(),
+                    Type::Int,
+                    Some(Expression::Identifier("y".to_string())),
+                ),
+                Statement::VarDeclaration(
+                    "copy1".to_string(),
+                    Type::Int,
+                    Some(Expression::Identifier("y".to_string())),
+                ),
+                Statement::VarDeclaration(
+                    "copy2".to_string(),
+                    Type::Int,
+                    Some(Expression::Identifier("y".to_string())),
+                ),
+                Statement::VarDeclaration(
+                    "copy3".to_string(),
+                    Type::Int,
+                    Some(Expression::Identifier("y".to_string())),
+                ),
+                Statement::Return(Some(Expression::Identifier("y".to_string()))),
+            ],
+            condition: None,
+            node_type: NodeType::Normal,
+            to_edges: BTreeSet::new(),
+            from_edges: BTreeSet::new(),
+        };
+
+        assert_eq!(node, &expected);
+    }
+
+    #[test]
+    fn test_local_value_numbering_commutativity() {
+        let ast = parse(
+            "
+            contract Vault[Open, Full, Locked] {
+                constructor({x:int}, {y:int}) {
+                    var sum1: int = x + y;
+                    var sum2: int = y + x;
+                    return sum2;
+                }
+            }",
+        )
+        .unwrap();
+
+        let mut tc = TypeChecker::new();
+        let _env = tc.check_program(&ast);
+
+        let mut cfg = FunctionsCFG::new();
+        cfg.parse_program(&ast);
+
+        let function_cfg: &mut ControlFlowGraph = cfg.get_mut("constructor").unwrap();
+
+        assert!(function_cfg.nodes.len() == 1);
+        let mut node = function_cfg.nodes.get_mut(0).unwrap();
+        node.local_value_numbering();
+
+        let expected = ControlFlowNode {
+            id: 0,
+            statements: vec![
+                Statement::VarDeclaration(
+                    "sum1".to_string(),
+                    Type::Int,
+                    Some(Expression::BinaryOp(
+                        Box::new(Expression::Identifier("x".to_string())),
+                        BinaryOperator::Add,
+                        Box::new(Expression::Identifier("y".to_string())),
+                    )),
+                ),
+                Statement::VarDeclaration(
+                    "sum2".to_string(),
+                    Type::Int,
+                    Some(Expression::Identifier("sum1".to_string())),
+                ),
+                Statement::Return(Some(Expression::Identifier("sum1".to_string()))),
+            ],
+            condition: None,
+            node_type: NodeType::Normal,
+            to_edges: BTreeSet::new(),
+            from_edges: BTreeSet::new(),
+        };
+
+        assert_eq!(node, &expected);
     }
 }

@@ -452,6 +452,37 @@ impl Statement {
             Self::While(_, block) => block.iter().any(|stmt| stmt.defines_variable(var)),
         }
     }
+
+    pub fn used_vars(&self) -> Vec<String> {
+        match self {
+            Self::Expression(expr) => expr.get_vars(),
+            Self::VarAssignment(_, expr) => expr.get_vars(),
+            Self::VarDeclaration(_, _, Some(expr)) => expr.get_vars(),
+            Self::VarDeclaration(_, _, None) => Vec::new(),
+            Self::ConstDeclaration(_, _, expr) => expr.get_vars(),
+            Self::Return(Some(expr)) => expr.get_vars(),
+            Self::Return(None) => Vec::new(),
+            Self::If(cond, then_block, else_block) => {
+                let mut vars = cond.get_vars();
+                for stmt in then_block {
+                    vars.append(&mut stmt.used_vars());
+                }
+                if let Some(else_block) = else_block {
+                    for stmt in else_block {
+                        vars.append(&mut stmt.used_vars());
+                    }
+                }
+                vars
+            }
+            Self::While(cond, block) => {
+                let mut vars = cond.get_vars();
+                for stmt in block {
+                    vars.append(&mut stmt.used_vars());
+                }
+                vars
+            }
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -476,6 +507,7 @@ impl Expression {
         Self::Identifier(name)
     }
 
+    // Get all variables (identifiers) used in the expression
     pub fn get_vars(&self) -> Vec<String> {
         match self {
             Self::Literal(_) => Vec::new(),
@@ -489,6 +521,7 @@ impl Expression {
         }
     }
 
+    // Index variables in the expression using the provided mapping <var_name, index>
     pub fn index_vars(&self, vars: &HashMap<String, usize>) -> Self {
         match self {
             Self::Literal(literal) => Self::Literal(literal.clone()),
@@ -589,7 +622,7 @@ impl Expression {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub enum BinaryOperator {
     Add,
     Sub,
@@ -627,7 +660,7 @@ impl From<&str> for BinaryOperator {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub enum UnaryOperator {
     Neg,
     Not,
@@ -643,7 +676,7 @@ impl From<&str> for UnaryOperator {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub enum Literal {
     Int(i64),
     Bool(bool),
