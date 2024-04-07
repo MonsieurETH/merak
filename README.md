@@ -67,6 +67,16 @@ Vault@Locked(owner) {
 ```
 
 
+### Transformations & Optimizations already implemented
+- [x] Control flow graph
+- [x] SSA
+
+- [X] Local value numbering
+  - [x] Dead code elimination (DCE) 
+  - [x] Copy propagation
+  - [x] Constant propagation
+  - [x] Common subexpression elimination (CSE) with commutativity  
+
 ### Contributing
 
 Merak is a 100% experimental project and code contributions are not welcome at this stage. However, if you want to support this project in any way, you can buy me a beer by sending ETH to this address: 0x7FF4408Bf503Cdd3991771a18E8F8C364eACE215
